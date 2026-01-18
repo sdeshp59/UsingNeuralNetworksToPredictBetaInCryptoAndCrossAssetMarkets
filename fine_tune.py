@@ -138,3 +138,85 @@ class FineTune():
                                     print(f"ERROR: {e}")
                                     continue
         return results, best
+
+    def generate_test_predictions(self, df: pd.DataFrame) -> Tuple[pd.DataFrame, pd.DataFrame]:
+        all_test_outputs = []
+        all_best_meta = []
+
+        for crypto in self.cryptos:
+            crypto_col = f'{crypto}_pct_ret'
+            if crypto_col not in df.columns:
+                continue
+
+            for market_col, market_name in self.mkt_combos:
+                pair_tuner = FineTune(
+                    crypto_list=[crypto],
+                    market_combinations=[(market_col, market_name)],
+                    w_list=self.w_list,
+                    hidden_list=self.hidden_list,
+                    lr_list=self.lr_list,
+                    activations=self.activations,
+                    batch_size=self.batch_size,
+                    max_epochs=self.max_epochs,
+                    with_ff=self.with_ff
+                )
+                _, best = pair_tuner.grid_search_mlp(df)
+
+                if best["combo"] is None:
+                    continue
+
+                combo = best["combo"]
+                w = combo["w"]
+
+                temp_df, feat_cols = self.processor.make_lagged_features_for_model(
+                    df, crypto_col, market_col, w, with_ff=self.with_ff
+                )
+                test_df = temp_df[temp_df['split'] == 'test'].copy()
+
+                if len(test_df) == 0:
+                    continue
+
+                best_model = NeuralBetaMLP(
+                    in_dim=best["in_dim"],
+                    hidden_dim=combo["hidden"],
+                    activation=combo["activation"]
+                ).to(DEVICE)
+                best_model.load_state_dict(best["state"])
+                best_model.eval()
+
+                X_test = best["scaler"].transform(test_df[feat_cols].values)
+                ds_test = NeuralBetaDataset(
+                    X_test,
+                    test_df['crypto_ret_next'].values,
+                    test_df['market_ret_next'].values
+                )
+                test_loader = DataLoader(ds_test, batch_size=1024, shuffle=False)
+
+                preds = []
+                with torch.no_grad():
+                    for batch in test_loader:
+                        x = batch["x"].to(DEVICE)
+                        beta_hat = best_model(x)
+                        preds.append(beta_hat.cpu().numpy())
+
+                out = test_df.copy()
+                out["beta_hat"] = np.concatenate(preds)
+                out["date"] = out.index
+                out["crypto"] = crypto
+                out["asset"] = market_name
+                out["pair"] = f"{crypto}-{market_name}"
+
+                all_test_outputs.append(out[["date", "crypto", "asset", "pair", "beta_hat"]])
+                all_best_meta.append({
+                    "crypto": crypto,
+                    "asset": market_name,
+                    "val_loss": best["val"],
+                    "w": w,
+                    "hidden": combo["hidden"],
+                    "lr": combo["lr"],
+                    "activation": combo["activation"]
+                })
+
+        test_long = pd.concat(all_test_outputs, ignore_index=True)
+        best_meta_df = pd.DataFrame(all_best_meta)
+        return test_long, best_meta_df
