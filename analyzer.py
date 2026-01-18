@@ -86,6 +86,8 @@ class Analyzer:
                                    title: Optional[str] = None,
                                    save_path: Optional[str] = None) -> pd.DataFrame:
         df = test_long.copy()
+        if pd.api.types.is_period_dtype(df["date"]): # type: ignore
+            df["date"] = df["date"].dt.to_timestamp() # type: ignore
         df["date"] = pd.to_datetime(df["date"])
         df["year"] = df["date"].dt.year # type: ignore
 
@@ -221,7 +223,7 @@ class Analyzer:
         return comparison
 
     def create_portfolio_analysis(self, test_long: pd.DataFrame, df: pd.DataFrame,
-                                   save_path: Optional[str] = None) -> tuple:
+                                  save_path: Optional[str] = None) -> tuple:
         asset_col_map = {
             'equity': 'MSF_pct_ret',
             'fiat': 'FIAT_pct_ret',
@@ -230,6 +232,8 @@ class Analyzer:
         }
 
         portfolio_df = test_long.copy()
+        if pd.api.types.is_period_dtype(portfolio_df["date"]): # type: ignore
+            portfolio_df["date"] = portfolio_df["date"].dt.to_timestamp() # type: ignore
         portfolio_df["date"] = pd.to_datetime(portfolio_df["date"])
 
         crypto_ret_next = []
@@ -256,7 +260,6 @@ class Analyzer:
         portfolio_df['asset_ret_next'] = asset_ret_next
         portfolio_df = portfolio_df.dropna(subset=['crypto_ret_next', 'asset_ret_next'])
 
-        # Compute absolute mean return for each crypto (for value weighting)
         crypto_abs_mean_ret = {}
         for crypto in portfolio_df['crypto'].unique():
             crypto_col = f'{crypto}_pct_ret'

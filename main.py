@@ -1,5 +1,4 @@
 from data_processor import DataProcessor
-from mlp import NeuralBetaMLP, NeuralBetaTrainer, NeuralBetaDataset
 from fine_tune import FineTune
 from analyzer import Analyzer
 
@@ -10,6 +9,9 @@ import torch
 import warnings
 
 warnings.simplefilter(action='ignore', category=FutureWarning)
+warnings.simplefilter(action='ignore', category=pd.errors.PerformanceWarning)
+warnings.simplefilter(action='ignore', category=pd.errors.SettingWithCopyWarning)
+warnings.simplefilter(action='ignore', category=pd.errors.DtypeWarning)
 pd.set_option('display.max_columns', None)
 pd.set_option('display.width', None)
 pd.set_option('display.float_format', lambda x: f'{x:.4f}')
