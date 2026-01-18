@@ -152,42 +152,35 @@ class DataProcessor():
             out[col] = out[col].ffill()
         return out
     
-    def make_lagged_features_for_model(self, df: pd.DataFrame, crypto_ret_col: str, market_ret_cols: list, w: int):
-        df = df.sort_index().copy()
-        lag_frames = []
+    def make_lagged_features_for_model(self, df: pd.DataFrame, crypto_ret_col: str,
+                                        market_ret_col: str, w: int, with_ff: bool = False,
+                                        ff_factors: List[str] = ["Mkt-RF", "SMB", "HML", "RMW", "CMA", "rf"]): # type: ignore
+        main = df.sort_index().copy()
         feat_cols = []
-        
+
+        if with_ff and ff_factors is None:
+            ff_factors = ["Mkt-RF", "SMB", "HML", "RMW", "CMA", "rf"]
+
         for k in range(1, w + 1):
-            cname = f"{crypto_ret_col}_lag{k}"
-            lag_frames.append(df[crypto_ret_col].shift(k).rename(cname))
-            feat_cols.append(cname)
-        
-        for mkt_col in market_ret_cols:
-            for k in range(1, w + 1):
-                cname = f"{mkt_col}_lag{k}"
-                lag_frames.append(df[mkt_col].shift(k).rename(cname))
-                feat_cols.append(cname)
-        
-        for ma_window in [3, 6]:
-            ma_name = f"{crypto_ret_col}_ma{ma_window}"
-            lag_frames.append(df[crypto_ret_col].rolling(ma_window).mean().rename(ma_name))
-            feat_cols.append(ma_name)
-            
-            ma_vol_name = f"{crypto_ret_col}_vol{ma_window}"
-            lag_frames.append(df[crypto_ret_col].rolling(ma_window).std().rename(ma_vol_name))
-            feat_cols.append(ma_vol_name)
-        
-        if lag_frames:
-            lags_df = pd.concat(lag_frames, axis=1)
-            df = pd.concat([df, lags_df], axis=1)
-        
-        primary_market = market_ret_cols[0]
-        df[f"crypto_ret_next"] = df[crypto_ret_col].shift(-1)
-        df[f"market_ret_next"] = df[primary_market].shift(-1)
-        df = df.dropna(subset=["crypto_ret_next", "market_ret_next"])
-        df[feat_cols] = df[feat_cols].fillna(0.0)
-        return df, feat_cols
-    
+            main[f'crypto_lag{k}'] = main[crypto_ret_col].shift(k)
+            feat_cols.append(f'crypto_lag{k}')
+            main[f'market_lag{k}'] = main[market_ret_col].shift(k)
+            feat_cols.append(f'market_lag{k}')
+
+        if with_ff:
+            for factor in ff_factors:
+                for k in range(1, w + 1):
+                    col_name = f'{factor}_lag{k}'
+                    main[col_name] = main[factor].shift(k)
+                    feat_cols.append(col_name)
+
+        main['crypto_ret_next'] = main[crypto_ret_col].shift(-1)
+        main['market_ret_next'] = main[market_ret_col].shift(-1)
+        main = main.dropna(subset=['crypto_ret_next', 'market_ret_next'])
+        main[feat_cols] = main[feat_cols].fillna(0.0)
+
+        return main, feat_cols
+
     @staticmethod
     def _month_split(ym:pd.Period):
         if pd.Period("2015-01", "M") <= ym <= pd.Period("2019-12", "M"):

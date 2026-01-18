@@ -231,35 +231,16 @@ class TestMakeLaggedFeatures:
         }, index=dates)
 
         result, feat_cols = dp.make_lagged_features_for_model(
-            df, 'crypto_ret', ['market_ret'], w=3
+            df, 'crypto_ret', 'market_ret', w=3
         )
 
         # Check lag columns exist
-        assert 'crypto_ret_lag1' in feat_cols
-        assert 'crypto_ret_lag2' in feat_cols
-        assert 'crypto_ret_lag3' in feat_cols
-        assert 'market_ret_lag1' in feat_cols
-        assert 'market_ret_lag2' in feat_cols
-        assert 'market_ret_lag3' in feat_cols
-
-    def test_creates_moving_average_features(self):
-        dp = DataProcessor()
-        dates = pd.date_range('2020-01-31', periods=10, freq='M')
-        df = pd.DataFrame({
-            'crypto_ret': [0.1 * i for i in range(10)],
-            'market_ret': [0.05 * i for i in range(10)],
-            'split': ['train'] * 10
-        }, index=dates)
-
-        result, feat_cols = dp.make_lagged_features_for_model(
-            df, 'crypto_ret', ['market_ret'], w=2
-        )
-
-        # Check MA columns exist
-        assert 'crypto_ret_ma3' in feat_cols
-        assert 'crypto_ret_ma6' in feat_cols
-        assert 'crypto_ret_vol3' in feat_cols
-        assert 'crypto_ret_vol6' in feat_cols
+        assert 'crypto_lag1' in feat_cols
+        assert 'crypto_lag2' in feat_cols
+        assert 'crypto_lag3' in feat_cols
+        assert 'market_lag1' in feat_cols
+        assert 'market_lag2' in feat_cols
+        assert 'market_lag3' in feat_cols
 
     def test_creates_next_return_columns(self):
         dp = DataProcessor()
@@ -271,7 +252,7 @@ class TestMakeLaggedFeatures:
         }, index=dates)
 
         result, feat_cols = dp.make_lagged_features_for_model(
-            df, 'crypto_ret', ['market_ret'], w=2
+            df, 'crypto_ret', 'market_ret', w=2
         )
 
         assert 'crypto_ret_next' in result.columns
@@ -287,7 +268,7 @@ class TestMakeLaggedFeatures:
         }, index=dates)
 
         result, feat_cols = dp.make_lagged_features_for_model(
-            df, 'crypto_ret', ['market_ret'], w=1
+            df, 'crypto_ret', 'market_ret', w=1
         )
 
         # Last row should be dropped since there's no "next" return
@@ -303,7 +284,7 @@ class TestMakeLaggedFeatures:
         }, index=dates)
 
         result, feat_cols = dp.make_lagged_features_for_model(
-            df, 'crypto_ret', ['market_ret'], w=2
+            df, 'crypto_ret', 'market_ret', w=2
         )
 
         # Check that feature columns don't have NaN
